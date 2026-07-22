@@ -504,6 +504,7 @@ export default {
         let maxStreaks = { up: 1, down: 1, same: 1 }
         let currentStreaks = { up: 1, down: 1, same: 1 }
         let differences = []
+        let diff;
         guess.forEach((digit, i) => {
             counts[digit] = (counts[digit] || 0) + 1
             if (i > 0) {
@@ -598,7 +599,7 @@ export default {
         if (guess[3] < guess[4]) tags.push('upend')
         else if (guess[3] > guess[4]) tags.push('downend')
 
-        let diff = Math.max(...guess) - Math.min(...guess)
+        diff = Math.max(...guess) - Math.min(...guess)
         tags.push(`difference${diff}`)
 
         tags.push(`core${guess[2]}`)
