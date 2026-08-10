@@ -105,6 +105,12 @@
                   @click="fillRandomGuess"
                 >Random Guess</v-btn>
                 <v-btn
+                  v-else-if="mode === 1 && gameCompleted"
+                  small
+                  color="blue"
+                  @click="initializeRandomPuzzle"
+                >New Puzzle</v-btn>
+                <v-btn
                   small
                   color="green"
                   dark
@@ -334,16 +340,7 @@ export default {
         this.draftGuess = Array(5).fill('')
         this.selectedCellIndex = 0
         if (this.randomGoal === null) {
-            let randomGoal = null
-            while (randomGoal === null || this.skips.has(randomGoal.join(''))) {
-                randomGoal = Math.floor(Math.random() * 100000).toString().padStart(5, '0').split('').map(Number)
-            }
-            this.randomGoal = {
-                guess: randomGoal,
-                tags: this.getTags(randomGoal)
-            }
-            this.randomGuesses = []
-            console.log(randomGoal)
+            this.initializeRandomPuzzle()
         }
         this.gameCompleted = this.guesses.length > 0 && this.guesses[this.guesses.length-1].guess.join('') === this.goal.guess.join('')
     }
@@ -435,6 +432,24 @@ export default {
       this.selectedCellIndex = 0
     },
 
+    initializeRandomPuzzle() {
+      let randomGoal = null
+      while (randomGoal === null || this.skips.has(randomGoal.join(''))) {
+        randomGoal = Math.floor(Math.random() * 100000).toString().padStart(5, '0').split('').map(Number)
+      }
+      this.randomGoal = {
+        guess: randomGoal,
+        tags: this.getTags(randomGoal)
+      }
+      console.log(randomGoal)
+      this.randomGuesses = []
+      this.randomKnownTrueTags = new Set()
+      this.randomKnownFalseTags = new Set()
+      this.draftGuess = Array(this.guessLength).fill('')
+      this.selectedCellIndex = 0
+      this.gameCompleted = false
+      this.winDialog = false
+    },
 
     submitGuess() {
       if (!this.isGuessComplete || this.gameCompleted || this.draftStops.length > 0) return
