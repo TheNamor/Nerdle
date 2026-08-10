@@ -96,7 +96,13 @@
 
               <div class="action-bar" :class="{ 'mobile-action-bar': isMobile }">
                 <v-btn small outlined color="green" @click="openTutorial">How to play</v-btn>
-                <div class="text-caption grey--text text--lighten-1">Guess {{ guesses.length }} of {{ maxRows }}</div>
+                <v-btn
+                  v-if="guesses.length === 0"
+                  small
+                  outlined
+                  color="blue"
+                  @click="fillRandomGuess"
+                >Random Guess</v-btn>
                 <v-btn
                   small
                   color="green"
@@ -165,7 +171,7 @@
           <v-btn icon text color="grey lighten-2" @click="tutorialStep = Math.max(0, tutorialStep - 1)" v-if="tutorialStep > 0"><v-icon>mdi-arrow-left-bold</v-icon></v-btn>
           <div v-else class="spacer"></div>
           <v-btn color="green" dark @click="tutorialStep === 2 ? closeTutorial() : advanceTutorial()" :icon="tutorialStep !== 2">
-            {{ tutorialStep === 2 ? 'Good luck!' : '' }}
+            {{ tutorialStep === 2 ? guesses.length == 0 ? 'Try using "Random Guess" for your first guess!' : 'Good luck!' : '' }}
             <v-icon v-if="tutorialStep !== 2">mdi-arrow-right-bold</v-icon>
           </v-btn>
         </v-card-actions>
@@ -412,6 +418,16 @@ export default {
       if (this.selectedCellIndex === -1) this.selectedCellIndex = this.draftGuess.length - 1
       this.$set(this.draftGuess, this.selectedCellIndex, '')
     },
+
+    fillRandomGuess() {
+      const randomValue = Math.floor(Math.random() * 100000)
+        .toString()
+        .padStart(this.guessLength, '0')
+        .split('')
+      this.draftGuess = randomValue
+      this.selectedCellIndex = 0
+    },
+
 
     submitGuess() {
       if (!this.isGuessComplete || this.gameCompleted || this.draftStops.length > 0) return
