@@ -43,11 +43,11 @@
 
                     <div v-if="row.submitted" class="feedback-shell">
                       <v-progress-circular
-                        :value="row.score * 100"
+                        :value="row.score[0]/row.score[1] * 100"
                         color="green"
                         rotate="-90"
                       >
-                        <span class="progress-label">{{ Math.round(row.score * 100) }}%</span>
+                        <span class="progress-label">{{ Math.round(row.score[0]/row.score[1] * 100) }}%</span>
                       </v-progress-circular>
                     </div>
                     <div v-else-if="!gameCompleted" class="feedback-shell muted">
@@ -195,22 +195,15 @@
             <div class="answer-pill">{{ goalGuessText }}</div>
           </div>
           <div>
-            <div class="font-weight-bold mb-2">Tags</div>
-            <div class="tag-row" v-if="goal">
-              <v-chip
-                v-for="tag in goal.tags"
-                :key="tag"
-                small
-                color="green"
-                text-color="white"
-                class="ma-1"
-              >
-                {{ getTagLabel(tag) }}
-              </v-chip>
+            <div class="font-weight-bold mb-2">Share</div>
+            <div class="tutorial-visual-card share-card">
+              <pre class="share-pre">{{ shareText }}</pre>
             </div>
           </div>
         </v-card-text>
         <v-card-actions class="justify-center pb-4">
+          <v-btn small rounded color="blue" @click="copyShare">Copy</v-btn>
+          <v-spacer></v-spacer>
           <v-btn color="blue" dark @click="winDialog = false" text rounded outlined>Nice!</v-btn>
         </v-card-actions>
       </v-card>
@@ -221,6 +214,7 @@
 <script>
 import seedrandom from 'seedrandom'
 import example from "./assets/example.png"
+import tagMap from '@/assets/tagMap.json'
 
 export default {
   mounted() {
@@ -263,6 +257,7 @@ export default {
     console.log(today, dailyGoal)
     // Find dupes
     // let startTime = performance.now()
+    this.tagMap = Object.fromEntries(Object.entries(tagMap).map(([num, tags]) => [num, new Set(tags)]))
     // let tagMap = {}
     // for (let i = 0; i < 100000; i++) {
     //     let guess = i.toString().padStart(5, '0').split('').map(Number)
@@ -281,20 +276,22 @@ export default {
     // console.log('Time taken to generate tag map: ', performance.now() - startTime, 'ms')
     // console.log(dupes.flat().map(num => num.join('')))
     // Nerdle bot
-    //this.tagMap = {}
+    // this.tagMap = {}
     // for (let i = 0; i < 100000; i++) {
     //     let guess = i.toString().padStart(5, '0').split('').map(Number)
     //     let tags = this.getTags(guess)
-    //     tags.sort()
-    //     const tagKey = tags.join(',')
-    //     if (!this.tagMap[tagKey]) {
-    //         this.tagMap[tagKey] = []
-    //     }
-    //     this.tagMap[tagKey].push(guess)
+    //     this.tagMap[i] = tags
     // }
     // console.log("tags mapped")
     // console.log(Object.entries(this.tagMap).toSorted((b,a) => b[0].length - a[0].length)[0][1])
-
+    // const a = document.createElement("a");
+    // a.href = URL.createObjectURL(new Blob([JSON.stringify(this.tagMap, null, 2)], {
+    //   type: "text/plain"
+    // }));
+    // a.setAttribute("download", "data.txt");
+    // document.body.appendChild(a);
+    // a.click();
+    // document.body.removeChild(a);
   },
 
   beforeDestroy() {
@@ -481,20 +478,12 @@ export default {
         localStorage.setItem("goal", JSON.stringify(this.dailyGoal))
         localStorage.setItem("guesses", JSON.stringify(this.guesses))
       }
-    //   Nerdle bot
-    //   let available = Object.entries(this.tagMap).filter(entry => {
-    //     let pass = true
-    //     if ([...this.knownTrueTags].some(t => !entry[0].split(",").includes(t))) pass = false
-    //     if (entry[0].split(",").some(t => this.knownFalseTags.has(t))) pass = false
-    //     return pass
-    //   })
-    //   console.log(available.length, available.toSorted((b,a) => b[0].length - a[0].length)[0][1])
     },
 
     scoreGuess(tags) {
         const goalTags = new Set(this.goal.tags)
         const sharedTags = tags.filter(tag => goalTags.has(tag))
-        return sharedTags.length / this.goal.tags.length
+        return [sharedTags.length, this.goal.tags.length]
     },
 
     getStats(guess) {
@@ -677,7 +666,22 @@ export default {
 
     getTagDescription(tag) {
       return this.descriptions[tag].description
-    }
+    },
+
+    copyShare() {
+      const text = this.shareText
+      if (!text) return
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+      } else {
+        const ta = document.createElement('textarea')
+        ta.value = text
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+      }
+    },
   },
   computed: {
     goal() {
@@ -702,6 +706,35 @@ export default {
 
     goalGuessText() {
       return this.goal ? this.goal.guess.join('') : ''
+    },
+
+    shareText() {
+      if (!this.goal) return ''
+      const lines = []
+      lines.push(`thenamor.github.io/Nerdle solved in ${this.guesses.length} guesses`)
+
+      const total = this.goal.tags.length
+      const trueSet = new Set()
+      const falseSet = new Set()
+
+      let available = Object.keys(this.tagMap)
+
+      this.guesses.forEach((g, idx) => {
+        // update known sets based on this guess
+        g.tags.forEach(t => {
+          if (this.goal.tags.includes(t)) trueSet.add(t)
+          else falseSet.add(t)
+        })
+
+        const correct = g.tags.filter(t => this.goal.tags.includes(t)).length
+        const pct = total > 0 ? Math.round((correct / total) * 100) : 0
+        available = available.filter(num => {
+          return trueSet.isSubsetOf(this.tagMap[num]) && falseSet.isDisjointFrom(this.tagMap[num])
+        })
+        lines.push(`${idx + 1}. ${correct}/${total} tags (${pct}%) - ` + (idx == this.guesses.length-1 ? `done!` : `${available.length} guess${available.length === 1 ? '' : 'es'} left`))
+      })
+
+      return lines.join('\n')
     },
 
     mobileDigits() {
@@ -1215,6 +1248,21 @@ button {
   background: rgba(255, 255, 255, 0.04);
   padding: 16px;
   text-align: center;
+}
+
+.share-card {
+  text-align: left;
+  max-height: 36vh;
+  overflow: auto;
+}
+
+.share-pre {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Courier New', monospace;
+  white-space: pre-wrap;
+  color: #e6ffea;
+  background: transparent;
+  padding: 6px 0;
 }
 
 .tag-sample {
