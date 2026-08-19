@@ -24,20 +24,25 @@
                           </div>
                         </template>
                         <template v-else-if="!gameCompleted">
-                          <input
+                          <div
                             v-for="(cell, colIndex) in row.cells"
                             :key="`${rowIndex}-${colIndex}`"
                             @click="selectedCellIndex = colIndex"
                             class="cell input-cell"
                             :class="{ active: colIndex === 0 || row.cells.some(value => value !== ''), selected: colIndex === selectedCellIndex }"
-                            type="text"
-                            inputmode="numeric"
-                            pattern="[0-9]*"
-                            maxlength="1"
-                            :value="cell"
-                            readonly
                             tabindex="-1"
-                          />
+                          >
+                            <div v-if="cell !== ''" class="cell-digit">{{ cell }}</div>
+                            <div v-else class="notes-grid">
+                              <span
+                                v-for="i in 10"
+                                :key="i-1"
+                                class="note"
+                                v-show="draftNotes[colIndex] && draftNotes[colIndex][i-1]"
+                                :style="getNoteStyle(i-1)"
+                              >{{ i-1 }}</span>
+                            </div>
+                          </div>
                         </template>
                       </div>
 
@@ -101,14 +106,24 @@
                   xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="30" height="30"
                   v-if="guesses.length === 0"
                   @click="fillRandomGuess"
-                ><path fill="white" :d="randomIcon"></path></svg>
+                  style="cursor: pointer;"
+                ><title>Random Guess</title><path fill="white" :d="randomIcon"></path></svg>
                 <v-btn
                   v-else-if="mode === 1 && gameCompleted"
                   small
                   color="blue"
                   @click="initializeRandomPuzzle"
                   icon
+                  title="New Puzzle"
                 ><v-icon>mdi-refresh</v-icon></v-btn>
+                <v-btn
+                  v-if="guesses.length > 0 && !gameCompleted"
+                  small
+                  :color="notesMode ? 'green' : 'grey'"
+                  @click="notesMode = !notesMode"
+                  icon
+                  title="Notes"
+                ><v-icon>mdi-pencil</v-icon></v-btn>
                 <v-btn
                   small
                   color="green"
@@ -291,7 +306,7 @@ export default {
     // })
     // let dupes = Object.values(overlaps).filter(arr => arr.length > 1)
     // console.log('Numbers that share tags: ', dupes.flat().length)
-// console.log(dupes.flat())
+    // console.log(dupes.flat())
     // let ind = Math.floor(Math.random() * dupes.length)
     // console.log('Sample', dupes.slice(ind, ind + 10))
     // console.log('Time taken to generate tag map: ', performance.now() - startTime, 'ms')
@@ -329,6 +344,8 @@ export default {
       guessLength: 5,
       maxRows: 5,
       draftGuess: Array(5).fill(''),
+      draftNotes: Array(5).fill(null).map(() => Array(10).fill(false)),
+      notesMode: false,
       selectedCellIndex: 0,
       dailyKnownFalseTags: new Set(),
       dailyKnownTrueTags: new Set(),
@@ -361,6 +378,9 @@ export default {
         if (this.randomGoal === null) {
             this.initializeRandomPuzzle()
         }
+        // clear notes when switching modes
+        this.draftNotes = Array(this.guessLength).fill(null).map(() => Array(10).fill(false))
+        this.notesMode = false
         this.gameCompleted = this.guesses.length > 0 && this.guesses[this.guesses.length-1].guess.join('') === this.goal.guess.join('')
     }
   },
@@ -394,7 +414,37 @@ export default {
 
     pressDigit(value) {
       if (this.tutorialDialog || this.gameCompleted || this.guesses.length >= this.maxRows) return
+      const digit = Number(value)
+      if (this.notesMode) {
+        const idx = this.selectedCellIndex >= 0 ? this.selectedCellIndex : 0
+        if (!this.draftNotes[idx]) {
+          this.$set(this.draftNotes, idx, Array(10).fill(false))
+        }
+        this.$set(this.draftNotes[idx], digit, !this.draftNotes[idx][digit])
+        return
+      }
       this.fillNextDigit(value)
+    },
+
+    getNoteStyle(index) {
+      // mapping: index -> (col, row)
+      // 0 1 2 3
+      // 4     5
+      // 6 7 8 9
+      let col = 1, row = 1
+      switch (index) {
+        case 0: col = 1; row = 1; break
+        case 1: col = 2; row = 1; break
+        case 2: col = 3; row = 1; break
+        case 3: col = 4; row = 1; break
+        case 4: col = 1; row = 2; break
+        case 5: col = 4; row = 2; break
+        case 6: col = 1; row = 3; break
+        case 7: col = 2; row = 3; break
+        case 8: col = 3; row = 3; break
+        case 9: col = 4; row = 3; break
+      }
+      return { gridColumn: col, gridRow: row, fontSize: this.isMobile ? '0.65em' : '0.5em' }
     },
 
     clearDraftGuess() {
@@ -420,7 +470,7 @@ export default {
 
       if (/^\d$/.test(event.key)) {
         event.preventDefault()
-        this.fillNextDigit(event.key)
+        this.pressDigit(event.key)
       }
     },
 
@@ -466,6 +516,8 @@ export default {
       this.randomKnownFalseTags = new Set()
       this.draftGuess = Array(this.guessLength).fill('')
       this.selectedCellIndex = 0
+      this.draftNotes = Array(this.guessLength).fill(null).map(() => Array(10).fill(false))
+      this.notesMode = false
       this.gameCompleted = false
       this.winDialog = false
     },
@@ -491,6 +543,8 @@ export default {
       this.guesses.push(guessEntry)
       this.draftGuess = Array(this.guessLength).fill('')
       this.selectedCellIndex = 0
+      // keep notes on submitting a full guess
+      this.notesMode = false
 
       if (digits.join('') === this.goal.guess.join('')) {
         this.gameCompleted = true
@@ -1167,6 +1221,29 @@ button {
   box-shadow: none !important;
   background: rgba(255, 255, 255, 0.04) !important;
   color: #f5f7fa !important;
+}
+
+.notes-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  padding: 6px 4px;
+  box-sizing: border-box;
+  align-content: center;
+}
+
+.note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* size relative to the cell's font-size so it scales responsively */
+  color: rgba(230, 255, 234, 0.95);
+  text-align: center;
+  line-height: 1;
+  height: 100%;
 }
 
 .input-cell:hover {
