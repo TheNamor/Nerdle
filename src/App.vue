@@ -743,11 +743,11 @@ export default {
     },
 
     getTagLabel(tag) {
-      return this.descriptions[tag].title
+      return this.descriptions[tag] ? this.descriptions[tag].title : tag
     },
 
     getTagDescription(tag) {
-      return this.descriptions[tag].description
+      return this.descriptions[tag] ? this.descriptions[tag].description : ''
     },
 
     copyShare() {
