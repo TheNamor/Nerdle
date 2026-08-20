@@ -1,7 +1,8 @@
 {
   "name": "Nerdle",
   "short_name": "Nerdle",
-  "start_url": "/",
+  "start_url": "/Nerdle/",
+  "id": "/Nerdle/",
   "display": "standalone",
   "background_color": "#0b0e0d",
   "theme_color": "#4caf50",

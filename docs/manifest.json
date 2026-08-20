@@ -1,1 +1,1 @@
-{"name":"Nerdle","short_name":"Nerdle","theme_color":"#4caf50","icons":[{"src":"/web-app-manifest-192x192.png","sizes":"192x192","type":"image/png"}],"start_url":"/","display":"standalone","background_color":"#0b0e0d"}
+{"name":"Nerdle","short_name":"Nerdle","theme_color":"#4caf50","icons":[{"src":"/web-app-manifest-192x192.png","sizes":"192x192","type":"image/png"}],"start_url":"/Nerdle/","display":"standalone","background_color":"#0b0e0d","id":"/Nerdle/"}
