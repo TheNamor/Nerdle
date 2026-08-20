@@ -3,6 +3,7 @@ import App from './App.vue'
 import vuetify from './plugins/vuetify'
 
 import '@mdi/font/css/materialdesignicons.css'
+import './registerServiceWorker'
 
 Vue.config.productionTip = false
 
