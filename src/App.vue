@@ -207,7 +207,7 @@
 
     <v-dialog v-model="winDialog" max-width="50vw" :fullscreen="$vuetify.breakpoint.xsOnly" persistent>
       <v-card class="celebration-card" color="rgba(18, 24, 20, 0.98)" :dark="true">
-        <v-card-title class="justify-center text-h5 green--text" style="word-break: normal !important; text-align: center;">{{ celebrations[guesses.length] }}</v-card-title>
+        <v-card-title class="justify-center text-h5 green--text" style="word-break: normal !important; text-align: center;">{{ guesses.length <= 5 ? celebrations[guesses.length] : "It's ok... you'll do better next time!" }}</v-card-title>
         <v-card-text class="text-center">
           <div class="text-h6 green--text">You found the answer in {{ guesses.length }} guess{{ guesses.length === 1 ? '' : 'es' }}.</div>
           <div class="mb-3">
@@ -266,6 +266,8 @@ export default {
         this.gameCompleted = this.guesses.length > 0 && this.guesses[this.guesses.length-1].guess.join('') === this.goal.guess.join('')
         if (this.gameCompleted) {
             this.winDialog = true
+        } else {
+            this.maxRows = Math.max(this.maxRows, this.guesses.length + 1)
         }
     } else {
         this.dailyGoal = {
@@ -553,6 +555,9 @@ export default {
       if (this.mode === 0) {
         localStorage.setItem("goal", JSON.stringify(this.dailyGoal))
         localStorage.setItem("guesses", JSON.stringify(this.guesses))
+      }
+      if (this.guesses.length >= this.maxRows && !this.gameCompleted) {
+          this.maxRows += 1
       }
     },
 
