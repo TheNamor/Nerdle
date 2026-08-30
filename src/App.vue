@@ -206,6 +206,7 @@
     </v-dialog>
 
     <v-dialog v-model="winDialog" max-width="50vw" :fullscreen="$vuetify.breakpoint.xsOnly" persistent>
+      <v-snackbar v-model="copied" :timeout="2000" color="success" text dark>Copied to clipboard!</v-snackbar>
       <v-card class="celebration-card" color="rgba(18, 24, 20, 0.98)" :dark="true">
         <v-card-title class="justify-center text-h5 green--text" style="word-break: normal !important; text-align: center;">{{ guesses.length <= 5 ? celebrations[guesses.length] : "It's ok... you'll do better next time!" }}</v-card-title>
         <v-card-text class="text-center">
@@ -360,6 +361,7 @@ export default {
       gameCompleted: false,
       winDialog: false,
       tutorialDialog: false,
+      copied: false,
       tutorialStep: 0,
       celebrations: {
         1: "Lucky duck! You got it on the first try!",
@@ -768,6 +770,7 @@ export default {
         document.execCommand('copy')
         document.body.removeChild(ta)
       }
+      this.copied = true
     },
   },
   computed: {
