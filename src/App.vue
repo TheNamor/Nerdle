@@ -1,5 +1,55 @@
 <template>
   <v-app dark>
+    <v-btn
+      class="auth-launcher"
+      icon
+      color="green lighten-2"
+      title="Account"
+      @click="authVisible = true"
+    >
+      <v-icon>{{ email ? 'mdi-account-check-outline' : 'mdi-account-outline' }}</v-icon>
+    </v-btn>
+
+    <v-dialog
+      v-model="authVisible"
+      max-width="440px"
+      :fullscreen="$vuetify.breakpoint.xsOnly"
+    >
+      <login
+        :email="email"
+        :authenticated="Boolean(token)"
+        :counts="counts"
+        :completed-puzzles="completedPuzzles"
+        @authenticated="handleAuthenticated"
+        @logout="handleLogout"
+        @close="authVisible = false"
+      />
+    </v-dialog>
+
+    <v-dialog v-model="archiveDialog" max-width="360px" :fullscreen="$vuetify.breakpoint.xsOnly">
+      <v-card color="rgba(18, 24, 20, 0.98)" dark>
+        <v-card-title class="text-h6">Nerdle archive</v-card-title>
+        <v-card-text>
+          <v-date-picker
+            v-model="archiveDay"
+            :max="yesterday"
+            :events="completedPuzzles"
+            event-color="green"
+            color="purple"
+            full-width
+            @change="selectArchiveDay"
+          />
+        </v-card-text>
+        <v-card-actions class="justify-space-between">
+          <v-btn v-if="!token" text small color="green lighten-2" outlined @click="openArchiveLogin">
+            Log in to save your progress
+          </v-btn>
+          <v-spacer v-else></v-spacer>
+          <v-btn text color="grey lighten-2" @click="archiveDialog = false">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-main class="app-shell">
       <v-container fluid class="fill-height pa-0">
         <v-row no-gutters class="fill-height align-center justify-center">
@@ -11,6 +61,7 @@
                 <v-btn-toggle mandatory v-model="mode" rounded>
                     <v-btn color="green" :class="{'white--text': mode == 0}" rounded x-small>Daily</v-btn>
                     <v-btn color="blue" :class="{'white--text': mode == 1}" rounded x-small>Random</v-btn>
+                    <v-btn color="purple" :class="{'white--text': mode == 2}" rounded x-small @click="archiveDialog = true">Archive</v-btn>
                 </v-btn-toggle>
               </div>
 
@@ -236,45 +287,39 @@
 import seedrandom from 'seedrandom'
 import example from "./assets/example.png"
 import tagMap from '@/assets/tagMap.json'
+import { getSummary, savePuzzle, getPuzzle } from '@/data'
+import Login from '@/components/Login.vue'
 
 export default {
-  mounted() {
+  components: {
+    Login
+  },
+
+  async mounted() {
     document.title = 'Nerdle'
+    this.token = localStorage.getItem('nerdle_token') || ''
+    this.email = localStorage.getItem('email') || ''
+    this.authVisible = !this.token
+    await this.getSummary()
     this.handleResize()
     window.addEventListener('keydown', this.handleGlobalKeydown)
     window.addEventListener('resize', this.handleResize)
-    let dailyGoal = null
-    const today = new Date().toLocaleString("en-US", {timeZone: "America/New_York"}).split(',')[0]
-    let random = seedrandom(today)
-    while (dailyGoal === null || this.skips.has(dailyGoal.join(''))) {
-        dailyGoal = Math.floor(random() * 100000).toString().padStart(5, '0').split('').map(Number)
+    const today = this.getDateString(new Date())
+    let dailyGoal = this.generateSeededGoal(today)
+    this.day = this.today = today
+    let savedGoal = JSON.parse(localStorage.getItem("puzzle"))
+    if ((!savedGoal || savedGoal.day !== today) && this.token) {
+      savedGoal = await getPuzzle(this.token, today)
+      if (savedGoal.ok && savedGoal.data) {
+        savedGoal = savedGoal.data
+      } else {
+        savedGoal = null
+      }
     }
-    let savedGoal = JSON.parse(localStorage.getItem("goal"))
-    if (savedGoal !== null && dailyGoal.join('') === savedGoal.guess.join('')) {
-        this.dailyGoal = savedGoal
-        this.dailyGuesses = JSON.parse(localStorage.getItem("guesses"))
-    }
-    if (this.dailyGoal !== null && this.dailyGuesses !== null) {
-        this.dailyGuesses.forEach(guess => {
-            guess.tags.forEach(tag => {
-                if (this.dailyGoal.tags.includes(tag)) {
-                    this.knownTrueTags.add(tag)
-                } else {
-                    this.knownFalseTags.add(tag)
-                }
-            })
-        })
-        this.gameCompleted = this.guesses.length > 0 && this.guesses[this.guesses.length-1].guess.join('') === this.goal.guess.join('')
-        if (this.gameCompleted) {
-            this.winDialog = true
-        } else {
-            this.maxRows = Math.max(this.maxRows, this.guesses.length + 1)
-        }
+    if (savedGoal !== null && savedGoal.day === today) {
+        this.loadPuzzle(savedGoal)
     } else {
-        this.dailyGoal = {
-            guess: dailyGoal,
-            tags: this.getTags(dailyGoal)
-        }
+      this.dailyGoal = dailyGoal
     }
     
     console.log(today, dailyGoal)
@@ -341,6 +386,9 @@ export default {
   data() {
     return {
       tagMap: {},
+      authVisible: false,
+      token: '',
+      email: '',
       mode: 0,
       example: example,
       isMobile: false,
@@ -354,6 +402,15 @@ export default {
       dailyKnownTrueTags: new Set(),
       randomKnownFalseTags: new Set(),
       randomKnownTrueTags: new Set(),
+      archiveDay: null,
+      archiveGoal: null,
+      archiveGuesses: [],
+      archiveKnownFalseTags: new Set(),
+      archiveKnownTrueTags: new Set(),
+      archiveDialog: false,
+      archiveLoading: false,
+      day: null,
+      today: null,
       dailyGoal: null,
       randomGoal: null,
       dailyGuesses: [],
@@ -362,6 +419,8 @@ export default {
       winDialog: false,
       tutorialDialog: false,
       copied: false,
+      completedPuzzles: [],
+      counts: {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0},
       tutorialStep: 0,
       celebrations: {
         1: "Lucky duck! You got it on the first try!",
@@ -379,7 +438,15 @@ export default {
     mode() {
         this.draftGuess = Array(5).fill('')
         this.selectedCellIndex = 0
-        if (this.randomGoal === null) {
+      if (this.mode === 2) {
+        if (!this.archiveDay) {
+          this.archiveDialog = true
+          this.archiveDay = this.yesterday
+        }
+        this.gameCompleted = false
+        return
+      }
+      if (this.randomGoal === null) {
             this.initializeRandomPuzzle()
         }
         // clear notes when switching modes
@@ -390,6 +457,146 @@ export default {
   },
 
   methods: {
+    async handleAuthenticated(session) {
+      this.token = session.token || localStorage.getItem('nerdle_token') || ''
+      this.email = session.email || ''
+      localStorage.setItem('nerdle_token', this.token)
+      localStorage.setItem('email', this.email)
+      this.authVisible = false
+      if (this.mode === 2 && this.archiveDay) {
+        await this.loadArchivePuzzle(this.archiveDay)
+      } else {
+        let r = await getPuzzle(this.token, this.today)
+        if (r.ok && r.data) {
+          this.loadPuzzle(r.data)
+          this.mode = 0
+        }
+      }
+      await this.getSummary()
+    },
+
+    openArchiveLogin() {
+      this.archiveDialog = false
+      this.authVisible = true
+    },
+
+    getDateString(date) {
+      const year = date.toLocaleString('en-US', { timeZone: 'America/New_York', year: 'numeric' })
+      const month = date.toLocaleString('en-US', { timeZone: 'America/New_York', month: '2-digit' })
+      const day = date.toLocaleString('en-US', { timeZone: 'America/New_York', day: '2-digit' })
+      return `${year}-${month}-${day}`
+    },
+
+    generateSeededGoal(day) {
+      const random = seedrandom(day)
+      let goal = null
+      while (goal === null || this.skips.has(goal.join(''))) {
+        goal = Math.floor(random() * 100000).toString().padStart(5, '0').split('').map(Number)
+      }
+      return {
+        guess: goal,
+        tags: this.getTags(goal)
+      }
+    },
+
+    handleLogout() {
+      this.token = ''
+      this.email = ''
+      this.authVisible = false
+      this.completedPuzzles = []
+      this.counts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0}
+    },
+
+    async getSummary() {
+      if (!this.token) return
+      let result = await getSummary(this.token)
+      if (result.ok && result.data && result.data.counts && result.data.completed) {
+        this.counts = result.data.counts
+        this.completedPuzzles = result.data.completed
+      }
+    },
+
+    async selectArchiveDay(day) {
+      if (!day) return
+      await this.loadArchivePuzzle(day)
+      this.archiveDialog = false
+    },
+
+    async loadArchivePuzzle(day) {
+      this.archiveDay = day
+      this.day = day
+      this.archiveGoal = this.generateSeededGoal(day)
+      this.archiveGuesses = []
+      this.archiveKnownTrueTags = new Set()
+      this.archiveKnownFalseTags = new Set()
+      this.maxRows = 5
+      this.gameCompleted = false
+      this.winDialog = false
+
+      if (this.token) {
+        this.archiveLoading = true
+        const result = await getPuzzle(this.token, day)
+        this.archiveLoading = false
+        if (result.ok && result.data) {
+          this.loadPuzzle(result.data)
+        }
+      }
+    },
+
+    savePuzzle() {
+      const puzzle = {
+        day: this.day,
+        goal: this.goal.guess.join(''),
+        guesses: this.guesses.map(g => g.guess.join('')),
+      }
+      if (this.mode === 0 && this.day === this.today) {
+        localStorage.setItem('puzzle', JSON.stringify(puzzle))
+      }
+      if (this.token) {
+        savePuzzle(this.token, puzzle)
+      }
+    },
+
+    loadPuzzle(puzzle) {
+      this.day = puzzle.day
+      const isArchive = this.mode === 2
+      const guessesKey = isArchive ? 'archiveGuesses' : 'dailyGuesses'
+      const goalKey = isArchive ? 'archiveGoal' : 'dailyGoal'
+      const trueTagsKey = isArchive ? 'archiveKnownTrueTags' : 'dailyKnownTrueTags'
+      const falseTagsKey = isArchive ? 'archiveKnownFalseTags' : 'dailyKnownFalseTags'
+      const loadedGuesses = puzzle.guesses.map(g => ({
+        guess: g.split('').map(Number),
+        tags: this.getTags(g.split('').map(Number))
+      }))
+      let goal = puzzle.goal.split('').map(Number)
+      this[goalKey] = {
+        guess: goal,
+        tags: this.getTags(goal)
+      }
+      this[trueTagsKey] = new Set()
+      this[falseTagsKey] = new Set()
+      loadedGuesses.forEach(guess => {
+        let right = 0
+        guess.tags.forEach(tag => {
+          if (this[goalKey].tags.includes(tag)) {
+            this[trueTagsKey].add(tag)
+            right++
+          } else {
+            this[falseTagsKey].add(tag)
+          }
+        })
+        guess.score = [right, this[goalKey].tags.length]
+      })
+      this[guessesKey] = loadedGuesses
+      this.maxRows = 5
+      this.gameCompleted = loadedGuesses.length > 0 && loadedGuesses[loadedGuesses.length-1].guess.join('') === this[goalKey].guess.join('')
+      if (this.gameCompleted) {
+          this.winDialog = true
+      } else {
+          this.maxRows = Math.max(this.maxRows, loadedGuesses.length + 1)
+      }
+    },
+
     openTutorial() {
       this.tutorialStep = 0
       this.tutorialDialog = true
@@ -457,6 +664,7 @@ export default {
     },
 
     handleGlobalKeydown(event) {
+      if (this.authVisible) return
       if (this.tutorialDialog) return
       if (this.gameCompleted || this.guesses.length >= this.maxRows) return
 
@@ -554,9 +762,8 @@ export default {
         this.gameCompleted = true
         this.winDialog = true
       }
-      if (this.mode === 0) {
-        localStorage.setItem("goal", JSON.stringify(this.dailyGoal))
-        localStorage.setItem("guesses", JSON.stringify(this.guesses))
+      if (this.mode === 0 || this.mode === 2) {
+        this.savePuzzle()
       }
       if (this.guesses.length >= this.maxRows && !this.gameCompleted) {
           this.maxRows += 1
@@ -775,19 +982,33 @@ export default {
   },
   computed: {
     goal() {
-        return this.mode === 0 ? this.dailyGoal : this.randomGoal
+      if (this.mode === 0) return this.dailyGoal
+      if (this.mode === 2) return this.archiveGoal
+      return this.randomGoal
     },
 
     guesses() {
-        return this.mode === 0 ? this.dailyGuesses : this.randomGuesses
+      if (this.mode === 0) return this.dailyGuesses
+      if (this.mode === 2) return this.archiveGuesses
+      return this.randomGuesses
     },
 
     knownFalseTags() {
-        return this.mode === 0 ? this.dailyKnownFalseTags : this.randomKnownFalseTags
+      if (this.mode === 0) return this.dailyKnownFalseTags
+      if (this.mode === 2) return this.archiveKnownFalseTags
+      return this.randomKnownFalseTags
     },
 
     knownTrueTags() {
-        return this.mode === 0 ? this.dailyKnownTrueTags : this.randomKnownTrueTags
+      if (this.mode === 0) return this.dailyKnownTrueTags
+      if (this.mode === 2) return this.archiveKnownTrueTags
+      return this.randomKnownTrueTags
+    },
+
+    yesterday() {
+      const date = new Date()
+      date.setDate(date.getDate() - 1)
+      return this.getDateString(date)
     },
 
     isGuessComplete() {
@@ -801,7 +1022,8 @@ export default {
     shareText() {
       if (!this.goal) return ''
       const lines = []
-      lines.push(`${this.mode == 0 ? 'Daily' : 'Random'} thenamor.github.io/Nerdle solved in ${this.guesses.length} guesses`)
+      const modeLabel = this.mode === 0 ? 'Daily' : this.mode === 2 ? `Archive ${this.archiveDay}` : 'Random'
+      lines.push(`${modeLabel} thenamor.github.io/Nerdle solved in ${this.guesses.length} guesses`)
 
       const total = this.goal.tags.length
       const trueSet = new Set()
@@ -1152,6 +1374,14 @@ export default {
 <style scoped>
 button {
   touch-action: manipulation;
+}
+
+.auth-launcher {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  background: rgba(18, 24, 20, 0.82);
 }
 
 .app-shell {
