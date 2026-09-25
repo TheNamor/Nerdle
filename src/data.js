@@ -5,6 +5,7 @@ async function readResponse(res) {
     if (!res.ok) {
         return {
             ok: false,
+            status: res.status,
             error: data && (data.error || data.message) || "The request could not be completed."
         };
     }

@@ -148,8 +148,6 @@ export default {
 		},
 
 		logout() {
-			localStorage.removeItem('nerdle_token')
-			localStorage.removeItem('email')
 			this.$emit('logout')
             this.clearError()
 		},

@@ -1,5 +1,19 @@
 <template>
   <v-app dark>
+    <v-alert
+      v-if="newUpdate"
+      class="session-update-notification"
+      color="orange darken-3"
+      dark
+      dense
+      dismissible
+      elevation="8"
+      @input="newUpdate = $event"
+    >
+      A new Nerdle update is available. Refresh the page and log back in to save your progress.
+      <v-btn text rounded outlined small class="ml-2" @click="refreshAfterUpdate">Refresh and log in</v-btn>
+    </v-alert>
+
     <v-btn
       class="auth-launcher"
       icon
@@ -312,6 +326,10 @@ export default {
       savedGoal = await getPuzzle(this.token, today)
       if (savedGoal.ok && savedGoal.data) {
         savedGoal = savedGoal.data
+      } else if (savedGoal.status === 401) {
+        this.handleLogout()
+        this.newUpdate = true
+        savedGoal = null
       } else {
         savedGoal = null
       }
@@ -419,6 +437,7 @@ export default {
       winDialog: false,
       tutorialDialog: false,
       copied: false,
+      newUpdate: false,
       completedPuzzles: [],
       counts: {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0},
       tutorialStep: 0,
@@ -500,6 +519,8 @@ export default {
     },
 
     handleLogout() {
+      localStorage.removeItem('nerdle_token')
+			localStorage.removeItem('email')
       this.token = ''
       this.email = ''
       this.authVisible = false
@@ -507,12 +528,20 @@ export default {
       this.counts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0}
     },
 
+    refreshAfterUpdate() {
+      this.newUpdate = false
+      window.location.reload()
+    },
+
     async getSummary() {
       if (!this.token) return
-      let result = await getSummary(this.token)
+      const result = await getSummary(this.token)
       if (result.ok && result.data && result.data.counts && result.data.completed) {
         this.counts = result.data.counts
         this.completedPuzzles = result.data.completed
+      } else if (result.status === 401) {
+        this.handleLogout()
+        this.newUpdate = true
       }
     },
 
@@ -539,11 +568,14 @@ export default {
         this.archiveLoading = false
         if (result.ok && result.data) {
           this.loadPuzzle(result.data)
+        } else if (result.status === 401) {
+          this.handleLogout()
+          this.newUpdate = true
         }
       }
     },
 
-    savePuzzle() {
+    async savePuzzle() {
       const puzzle = {
         day: this.day,
         goal: this.goal.guess.join(''),
@@ -553,7 +585,11 @@ export default {
         localStorage.setItem('puzzle', JSON.stringify(puzzle))
       }
       if (this.token) {
-        savePuzzle(this.token, puzzle)
+        const result = await savePuzzle(this.token, puzzle)
+        if (!result.ok && result.status === 401) {
+          this.handleLogout()
+          this.newUpdate = true
+        }
       }
     },
 
@@ -761,6 +797,9 @@ export default {
       if (digits.join('') === this.goal.guess.join('')) {
         this.gameCompleted = true
         this.winDialog = true
+        if (this.mode !== 1) {
+          this.counts[this.guesses.length]++
+        }
       }
       if (this.mode === 0 || this.mode === 2) {
         this.savePuzzle()
@@ -979,6 +1018,12 @@ export default {
       }
       this.copied = true
     },
+
+    translateDay(day) {
+      if (!day) return ''
+      const bits = day.split('-')
+      return `${bits[1]}/${bits[2]}/${bits[0]}`
+    },
   },
   computed: {
     goal() {
@@ -1022,7 +1067,7 @@ export default {
     shareText() {
       if (!this.goal) return ''
       const lines = []
-      const modeLabel = this.mode === 0 ? 'Daily' : this.mode === 2 ? `Archive ${this.archiveDay}` : 'Random'
+      const modeLabel = this.mode === 0 ? 'Daily' : this.mode === 2 ? `Archive ${this.translateDay(this.archiveDay)}` : 'Random'
       lines.push(`${modeLabel} thenamor.github.io/Nerdle solved in ${this.guesses.length} guesses`)
 
       const total = this.goal.tags.length
@@ -1374,6 +1419,17 @@ export default {
 <style scoped>
 button {
   touch-action: manipulation;
+}
+
+.session-update-notification {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 10;
+  margin: 0;
+  border-radius: 0;
+  text-align: center;
 }
 
 .auth-launcher {
