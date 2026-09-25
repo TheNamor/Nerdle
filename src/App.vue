@@ -14,6 +14,20 @@
       <v-btn text rounded outlined small class="ml-2" @click="refreshAfterUpdate">Refresh and log in</v-btn>
     </v-alert>
 
+    <v-alert
+      v-if="isOffline && token && !offlineDismissed"
+      class="offline-notification"
+      :class="{ 'offline-notification-with-update': newUpdate }"
+      color="orange darken-3"
+      dark
+      dense
+      dismissible
+      elevation="8"
+      @input="dismissOfflineAlert"
+    >
+      You are currently offline, progress is not being saved
+    </v-alert>
+
     <v-btn
       class="auth-launcher"
       icon
@@ -318,6 +332,8 @@ export default {
     this.handleResize()
     window.addEventListener('keydown', this.handleGlobalKeydown)
     window.addEventListener('resize', this.handleResize)
+    window.addEventListener('offline', this.handleOffline)
+    window.addEventListener('online', this.handleOnline)
     const today = this.getDateString(new Date())
     let dailyGoal = this.generateSeededGoal(today)
     this.day = this.today = today
@@ -399,6 +415,8 @@ export default {
   beforeDestroy() {
     window.removeEventListener('keydown', this.handleGlobalKeydown)
     window.removeEventListener('resize', this.handleResize)
+    window.removeEventListener('offline', this.handleOffline)
+    window.removeEventListener('online', this.handleOnline)
   },
 
   data() {
@@ -438,6 +456,8 @@ export default {
       tutorialDialog: false,
       copied: false,
       newUpdate: false,
+      isOffline: !navigator.onLine,
+      offlineDismissed: false,
       completedPuzzles: [],
       counts: {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0},
       tutorialStep: 0,
@@ -476,6 +496,37 @@ export default {
   },
 
   methods: {
+    handleOffline() {
+      this.isOffline = true
+      this.offlineDismissed = false
+    },
+
+    async handleOnline() {
+      this.isOffline = false
+      this.offlineDismissed = false
+      await this.reloadCurrentPuzzle()
+    },
+
+    dismissOfflineAlert() {
+      this.offlineDismissed = true
+    },
+
+    async reloadCurrentPuzzle() {
+      if (!this.token || this.mode === 1) return
+      if (this.mode === 2 && this.archiveDay) {
+        await this.loadArchivePuzzle(this.archiveDay)
+        return
+      }
+
+      const result = await getPuzzle(this.token, this.today)
+      if (result.ok && result.data) {
+        this.loadPuzzle(result.data)
+      } else if (result.status === 401) {
+        this.handleLogout()
+        this.newUpdate = true
+      }
+    },
+
     async handleAuthenticated(session) {
       this.token = session.token || localStorage.getItem('nerdle_token') || ''
       this.email = session.email || ''
@@ -1430,6 +1481,21 @@ button {
   margin: 0;
   border-radius: 0;
   text-align: center;
+}
+
+.offline-notification {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 9;
+  margin: 0;
+  border-radius: 0;
+  text-align: center;
+}
+
+.offline-notification-with-update {
+  top: 48px;
 }
 
 .auth-launcher {
