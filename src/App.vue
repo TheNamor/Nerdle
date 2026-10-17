@@ -35,7 +35,7 @@
       title="Account"
       @click="authVisible = true"
     >
-      <v-icon>{{ email ? 'mdi-account-check-outline' : 'mdi-account-outline' }}</v-icon>
+      <v-icon>{{ isOffline ? 'mdi-wifi-off' : (email ? 'mdi-account-check-outline' : 'mdi-account-outline') }}</v-icon>
     </v-btn>
 
     <v-dialog
@@ -54,7 +54,7 @@
       />
     </v-dialog>
 
-    <v-dialog v-model="archiveDialog" max-width="360px" :fullscreen="$vuetify.breakpoint.xsOnly">
+    <v-dialog v-model="archiveDialog" max-width="360px" persistent :fullscreen="$vuetify.breakpoint.xsOnly">
       <v-card color="rgba(18, 24, 20, 0.98)" dark>
         <v-card-title class="text-h6">Nerdle archive</v-card-title>
         <v-card-text>
@@ -478,9 +478,11 @@ export default {
         this.draftGuess = Array(5).fill('')
         this.selectedCellIndex = 0
       if (this.mode === 2) {
+        this.draftNotes = Array(this.guessLength).fill(null).map(() => Array(10).fill(false))
+        this.notesMode = false
         if (!this.archiveDay) {
           this.archiveDialog = true
-          this.archiveDay = this.yesterday
+          this.archiveDay = this.today
         }
         this.gameCompleted = false
         return
@@ -509,6 +511,12 @@ export default {
 
     dismissOfflineAlert() {
       this.offlineDismissed = true
+    },
+
+    closeArchive() {
+      this.archiveDialog = false
+      this.archiveDay = null
+      this.mode = 0
     },
 
     async reloadCurrentPuzzle() {
