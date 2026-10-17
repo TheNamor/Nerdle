@@ -316,7 +316,7 @@ export default {
 
 	computed: {
 		baseUrl() {
-			return process.env.BASE_URL
+			return process.env.NODE_ENV === 'production' ? '/Nerdle' : 'http://localhost:8080'
 		},
 
 		collectedBadges() {
