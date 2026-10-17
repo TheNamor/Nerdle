@@ -48,6 +48,8 @@
         :authenticated="Boolean(token)"
         :counts="counts"
         :completed-puzzles="completedPuzzles"
+        :badge-counts="badgeCounts"
+        :badge-descriptions="badgeDescriptions"
         @authenticated="handleAuthenticated"
         @logout="handleLogout"
         @close="authVisible = false"
@@ -73,7 +75,7 @@
             Log in to save your progress
           </v-btn>
           <v-spacer v-else></v-spacer>
-          <v-btn text color="grey lighten-2" @click="archiveDialog = false">Close</v-btn>
+          <v-btn text color="grey lighten-2" @click="closeArchive">Close</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -204,6 +206,14 @@
                   title="Notes"
                 ><v-icon>mdi-pencil</v-icon></v-btn>
                 <v-btn
+                  v-if="gameCompleted"
+                  small
+                  color="green"
+                  @click="winDialog = true"
+                  icon
+                  title="Goal Summary"
+                ><v-icon>mdi-flag-checkered</v-icon></v-btn>
+                <v-btn
                   small
                   color="green"
                   dark
@@ -300,6 +310,34 @@
               <pre class="share-pre">{{ shareText }}</pre>
             </div>
           </div>
+          <div class="font-weight-bold my-2" v-if="guessStats.badges.length">Badges Earned</div>
+          <div class="d-flex flex-wrap justify-center" style="gap: 8px;">
+            <v-tooltip
+              v-for="badge in guessStats.badges"
+              :key="badge"
+              bottom
+              open-on-hover
+              open-on-click
+            >
+              <template v-slot:activator="{ on, attrs }">
+                <div
+                  v-bind="attrs"
+                  v-on="on"
+                  class="d-flex flex-column align-center text-caption"
+                  style="width: 88px;"
+                >
+                  <img
+                    :src="`/badges/${badge}.png`"
+                    :alt="badgeDescriptions[badge].title"
+                    width="64"
+                    height="64"
+                  >
+                  <span class="badge-title">{{ badgeDescriptions[badge].title }}</span>
+                </div>
+              </template>
+              <div style="text-align: center;">{{ badgeDescriptions[badge].description }}</div>
+            </v-tooltip>
+          </div>
         </v-card-text>
         <v-card-actions class="justify-center pb-4">
           <v-btn small rounded color="blue" @click="copyShare">Copy</v-btn>
@@ -338,7 +376,7 @@ export default {
     let dailyGoal = this.generateSeededGoal(today)
     this.day = this.today = today
     let savedGoal = JSON.parse(localStorage.getItem("puzzle"))
-    if ((!savedGoal || savedGoal.day !== today) && this.token) {
+    if (this.token) {
       savedGoal = await getPuzzle(this.token, today)
       if (savedGoal.ok && savedGoal.data) {
         savedGoal = savedGoal.data
@@ -410,6 +448,47 @@ export default {
     // document.body.appendChild(a);
     // a.click();
     // document.body.removeChild(a);
+
+    // const r = await fetch("https://nerdle-worker.thenamor2.workers.dev/clone", {
+    //     method: "POST",
+    //     headers: { "Content-Type": "application/json" },
+    //     body: JSON.stringify({ password: "secret password" })
+    // })
+    // const data = await r.json().catch(() => null)
+    // let badges = {}
+    // let summaries = {}
+    // for (const path in data.data) {
+    //   console.log(path)
+    //   let email = path.split("/")[0]
+    //   if (!badges[email]) {
+    //     badges[email] = {}
+    //   }
+    //   if (path.endsWith("summary.json")) {
+    //     summaries[email] = data.data[path]
+    //     continue
+    //   }
+    //   this.loadPuzzle(data.data[path])
+    //   this.guessStats.badges.forEach(badge => {
+    //     if (!badges[email][badge]) {
+    //       badges[email][badge] = 0
+    //     }
+    //     badges[email][badge] += 1
+    //   })
+    // }
+    // console.log(badges)
+    // for (const email in summaries) {
+    //   console.log(email)
+    //   let summary = summaries[email]
+    //   summary.badges = badges[email]
+    //   const a = document.createElement("a");
+    //   a.href = URL.createObjectURL(new Blob([JSON.stringify(summary)], {
+    //     type: "text/plain"
+    //   }));
+    //   a.setAttribute("download", `${email}/summary.json`);
+    //   document.body.appendChild(a);
+    //   a.click();
+    //   document.body.removeChild(a);
+    // }
   },
 
   beforeDestroy() {
@@ -460,6 +539,7 @@ export default {
       offlineDismissed: false,
       completedPuzzles: [],
       counts: {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0},
+      badgeCounts: {},
       tutorialStep: 0,
       celebrations: {
         1: "Lucky duck! You got it on the first try!",
@@ -585,6 +665,7 @@ export default {
       this.authVisible = false
       this.completedPuzzles = []
       this.counts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0}
+      this.badgeCounts = {}
     },
 
     refreshAfterUpdate() {
@@ -598,6 +679,7 @@ export default {
       if (result.ok && result.data && result.data.counts && result.data.completed) {
         this.counts = result.data.counts
         this.completedPuzzles = result.data.completed
+        this.badgeCounts = result.data.badges || {}
       } else if (result.status === 401) {
         this.handleLogout()
         this.newUpdate = true
@@ -639,6 +721,7 @@ export default {
         day: this.day,
         goal: this.goal.guess.join(''),
         guesses: this.guesses.map(g => g.guess.join('')),
+        badges: this.guessStats.badges,
       }
       if (this.mode === 0 && this.day === this.today) {
         localStorage.setItem('puzzle', JSON.stringify(puzzle))
@@ -1083,6 +1166,38 @@ export default {
       const bits = day.split('-')
       return `${bits[1]}/${bits[2]}/${bits[0]}`
     },
+
+    completesSet(day) {
+      const parseDate = value => {
+        const [year, month, dayOfMonth] = value.split('-').map(Number)
+        const timestamp = Date.UTC(year, month - 1, dayOfMonth)
+        return { year, month, timestamp }
+      }
+
+      const targetDate = parseDate(day)
+      const completedDates = this.completedPuzzles.map(parseDate)
+      const weekStart = targetDate.timestamp - new Date(targetDate.timestamp).getUTCDay() * 86400000
+      const completedWeekDates = completedDates
+        .filter(date => date.timestamp >= weekStart && date.timestamp < weekStart + 7 * 86400000)
+      const weekDates = new Set(completedWeekDates.map(date => date.timestamp))
+      weekDates.add(targetDate.timestamp)
+
+      const completedMonthDates = completedDates
+        .filter(date => date.year === targetDate.year && date.month === targetDate.month)
+      const monthDates = new Set(completedMonthDates.map(date => date.timestamp))
+      monthDates.add(targetDate.timestamp)
+
+      const isCompletingWeek = !this.completedPuzzles.includes(day) ||
+        completedWeekDates[completedWeekDates.length - 1].timestamp === targetDate.timestamp
+      const isCompletingMonth = !this.completedPuzzles.includes(day) ||
+        completedMonthDates[completedMonthDates.length - 1].timestamp === targetDate.timestamp
+
+      const daysInMonth = new Date(Date.UTC(targetDate.year, targetDate.month, 0)).getUTCDate()
+      return {
+        week: isCompletingWeek && weekDates.size === 7,
+        month: isCompletingMonth && monthDates.size === daysInMonth
+      }
+    }
   },
   computed: {
     goal() {
@@ -1123,30 +1238,95 @@ export default {
       return this.goal ? this.goal.guess.join('') : ''
     },
 
-    shareText() {
-      if (!this.goal) return ''
-      const lines = []
-      const modeLabel = this.mode === 0 ? 'Daily' : this.mode === 2 ? `Archive ${this.translateDay(this.archiveDay)}` : 'Random'
-      lines.push(`${modeLabel} thenamor.github.io/Nerdle solved in ${this.guesses.length} guesses`)
+    guessStats() {
+      if (!this.goal || !this.gameCompleted) return { stats: [], badges: [] }
 
       const total = this.goal.tags.length
       const trueSet = new Set()
       const falseSet = new Set()
+      var badges = []
 
       let available = Object.keys(this.tagMap)
+      let left;
 
-      this.guesses.forEach((g, idx) => {
+      const stats = this.guesses.map((g, idx) => {
+        if (g.guess.join('') === this.goal.guess.join('')) {
+          if (idx === 0) {
+            badges.push('luck_max')
+          } else if (available.length >= 4) {
+            left = available.length
+            console.log(left, idx)
+            if (left == 4) badges.push('luck_4')
+            else if (5 <= left && left < 10) badges.push('luck_5')
+            else if (10 <= left && left < 30) badges.push('luck_10')
+            else if (30 <= left && left < 50) badges.push('luck_30')
+            else if (50 <= left) badges.push('luck_50')
+          }
+          if (this.mode !== 1) {
+            let { week, month } = this.completesSet(this.day)
+            if (week) badges.push('sprint')
+            if (month) badges.push('marathon')
+            if (!this.completedPuzzles.includes(this.day) && this.completedPuzzles.length + 1 % 100 === 0) badges.push('nerdle_overtime')
+          }
+        } else {
+          let correct = 0
+          let matching = true
+          g.guess.map((digit, i) => {
+            if (!this.goal.guess.includes(digit) || (!g.guess.includes(this.goal.guess[i]))) {
+              matching = false
+            }
+            if (digit === this.goal.guess[i]) {
+              correct++
+            }
+          })
+          if (matching) badges.push('so_close')
+          if (correct === 4) badges.push('one_off')
+        }
+
         // update known sets based on this guess
+        let newTags = []
         g.tags.forEach(t => {
-          if (this.goal.tags.includes(t)) trueSet.add(t)
-          else falseSet.add(t)
+          if (this.goal.tags.includes(t)) {
+            if (!trueSet.has(t)) {
+              newTags.push({tag: t, correct: true})
+            }
+            if (idx === 0 && t.includes('core')) badges.push('satisfying')
+            trueSet.add(t)
+          }
+          else {
+            if (!falseSet.has(t)) {
+              newTags.push({tag: t, correct: false})
+            }
+            falseSet.add(t)
+          }
         })
-
+        if (newTags.filter(t => t.correct).length === 0) badges.push('whoops')
+        if (idx !== this.guesses.length-1 && newTags.filter(t => !t.correct).length === 0) badges.push('yippee')
+        if (idx !== 0 && newTags.filter(t => t.correct).length/total >= 0.5) badges.push('excellent_guess')
         const correct = g.tags.filter(t => this.goal.tags.includes(t)).length
-        const pct = total > 0 ? Math.round((correct / total) * 100) : 0
+        if (idx === 0 && correct / total >= 0.5) badges.push('strong_start')
         available = available.filter(num => {
           return trueSet.isSubsetOf(this.tagMap[num]) && falseSet.isDisjointFrom(this.tagMap[num])
         })
+        if (idx === 0 && available.length === 1 && this.guesses.length > 1) badges.push('gold_start')
+        return { correct, total, available }
+      })
+      let lefts = stats.map(s => s.available.length)
+      if (JSON.stringify(lefts.slice(-4, -1)) == JSON.stringify([3, 2, 1])) badges.push('unlucky')
+      if (this.guesses.length > 5) badges.push('perseverance')
+      if (this.mode === 1) badges = []
+      return { stats, badges: Array.from(new Set(badges)) }
+    },
+
+    shareText() {
+      const lines = []
+      const modeLabel = this.mode === 0 ? 'Daily' : this.mode === 2 ? `Archive ${this.translateDay(this.archiveDay)}` : 'Random'
+      lines.push(`${modeLabel} thenamor.github.io/Nerdle solved in ${this.guesses.length} guesses`)
+
+      const stats = this.guessStats.stats
+      stats.forEach((stat, idx) => {
+        const { correct, total, available } = stat
+        const pct = total > 0 ? Math.round((correct / total) * 100) : 0
         lines.push(`${idx + 1}. ${correct}/${total} tags (${pct}%) - ` + (idx == this.guesses.length-1 ? `done!` : `${available.length} number${available.length === 1 ? '' : 's'} left`))
       })
 
@@ -1470,6 +1650,86 @@ export default {
             }
         }
         return descriptions
+    },
+    badgeDescriptions() {
+      return {
+        luck_4: {
+          title: 'Lucky 4',
+          description: 'Got the goal when 4 possible numbers remained. Not bad!'
+        },
+        luck_5: {
+          title: 'Lucky 5',
+          description: 'Got the goal when more than 5 possible numbers remained. Pretty lucky!'
+        },
+        luck_10: {
+          title: 'Lucky 10',
+          description: 'Got the goal when more than 10 possible numbers remained. Very lucky!'
+        },
+        luck_30: {
+          title: 'Lucky 30',
+          description: 'Got the goal when more than 30 possible numbers remained. Extremely lucky!'
+        },
+        luck_50: {
+          title: 'Lucky 50',
+          description: 'Got the goal when more than 50 possible numbers remained. What are the odds?!'
+        },
+        luck_max: {
+          title: 'Maximum Luck',
+          description: "I don't believe you"
+        },
+        strong_start: {
+          title: 'Strong Start',
+          description: 'Get at 50% or more of the correct tags on your first guess.'
+        },
+        gold_start: {
+          title: 'Gold Start',
+          description: 'Have only 1 possible number remaining after your first guess.'
+        },
+        excellent_guess: {
+          title: 'Excellent Guess',
+          description: 'Get at least 50% of the correct tags on a single guess.'
+        },
+        unlucky: {
+          title: 'Unlucky',
+          description: 'Have 3 possible numbers left, then 2, then 1.'
+        },
+        sprint: {
+          title: 'Sprint',
+          description: 'Complete a full week of nerdles.'
+        },
+        marathon: {
+          title: 'Marathon',
+          description: 'Complete a full month of nerdles.'
+        },
+        nerdle_overtime: {
+          title: 'Nerdle Overtime',
+          description: 'Complete 100 nerdles.'
+        },
+        perseverance: {
+          title: 'Perseverance',
+          description: 'Complete a nerdle in 6 or more guesses.'
+        },
+        satisfying: {
+          title: 'Satisfying',
+          description: 'Get the correct core tag on your first guess.'
+        },
+        whoops: {
+          title: 'Whoops',
+          description: 'Make a guess that has no new correct tags.'
+        },
+        yippee: {
+          title: 'Yippee!',
+          description: 'Make a guess that has all new correct tags (but is not the goal number).'
+        },
+        so_close: {
+          title: 'So Close',
+          description: 'Make a guess that has all the right numbers, just in the wrong configuration.'
+        },
+        one_off: {
+          title: 'One Off',
+          description: 'Make a guess that has 4 out of 5 correct digits.'
+        }
+      }
     }
   }
 }
@@ -1862,6 +2122,11 @@ button {
 
   .tag-panel {
     justify-content: center;
+  }
+
+  .badge-title {
+    line-height: 1;
+    padding-top: 3px;
   }
 }
 </style>
