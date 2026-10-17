@@ -53,7 +53,7 @@
 												class="badge-tooltip-target"
 											>
 												<img
-													:src="`/badges/${badge.name}.png`"
+													:src="`${baseUrl}/badges/${badge.name}.png`"
 													:alt="badge.description.title"
 													width="64"
 													height="64"
@@ -315,6 +315,10 @@ export default {
 	},
 
 	computed: {
+		baseUrl() {
+			return process.env.BASE_URL
+		},
+
 		collectedBadges() {
 			return Object.entries(this.badgeCounts)
 				.map(([name, count]) => ({
@@ -521,6 +525,7 @@ export default {
 	line-height: 1.15;
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 2;
+	line-clamp: 2;
 }
 
 .badge-count {

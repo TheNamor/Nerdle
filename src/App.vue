@@ -327,7 +327,7 @@
                   style="width: 88px;"
                 >
                   <img
-                    :src="`/badges/${badge}.png`"
+                    :src="`${baseUrl}/badges/${badge}.png`"
                     :alt="badgeDescriptions[badge].title"
                     width="64"
                     height="64"
@@ -1200,6 +1200,10 @@ export default {
     }
   },
   computed: {
+    baseUrl() {
+      return process.env.BASE_URL
+    },
+
     goal() {
       if (this.mode === 0) return this.dailyGoal
       if (this.mode === 2) return this.archiveGoal
