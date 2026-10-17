@@ -941,6 +941,9 @@ export default {
         this.winDialog = true
         if (this.mode !== 1) {
           this.counts[this.guesses.length]++
+          this.guessStats.badges.forEach(badge => {
+            this.badgeCounts[badge] = (this.badgeCounts[badge] || 0) + 1
+          })
         }
       }
       if (this.mode === 0 || this.mode === 2) {

@@ -39,7 +39,7 @@
 								<v-icon>mdi-chevron-right</v-icon>
 							</v-btn>
 						</div>
-						<div v-if="collectedBadges.length" class="badge-page" ref="badgePage">
+						<div v-if="collectedBadges.length" class="badge-page" ref="badgePage" v-touch="{ left: () => changeBadgePage(1), right: () => changeBadgePage(-1) }">
 							<div
 								class="badge-grid"
 								:style="{ gridTemplateColumns: `repeat(${badgeColumns}, minmax(0, 1fr))` }"
@@ -72,7 +72,7 @@
 						<div v-else class="badge-empty">No badges collected yet.</div>
 					</v-tab-item>
 				</v-tabs-items>
-				<v-btn block outlined color="green lighten-2" @click="logout">
+				<v-btn block outlined color="green lighten-2" style="max-height: 36px;" @click="logout">
 					<v-icon left>mdi-logout</v-icon>
 					Log out
 				</v-btn>
@@ -651,7 +651,6 @@ export default {
 
 	.badge-page {
 		flex: 1 1 auto;
-		height: auto;
 		max-height: none;
 	}
 
