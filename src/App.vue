@@ -1416,12 +1416,15 @@ export default {
       const modeLabel = this.mode === 0 ? 'Daily' : this.mode === 2 ? `Archive ${this.translateDay(this.archiveDay)}` : 'Random'
       lines.push(`${modeLabel} thenamor.github.io/Nerdle solved in ${this.guesses.length} guesses`)
 
-      const stats = this.guessStats.stats
+      const { stats, badges } = this.guessStats
       stats.forEach((stat, idx) => {
         const { correct, total, available } = stat
         const pct = total > 0 ? Math.round((correct / total) * 100) : 0
         lines.push(`${idx + 1}. ${correct}/${total} tags (${pct}%) - ` + (idx == this.guesses.length-1 ? `done!` : `${available.length} number${available.length === 1 ? '' : 's'} left`))
       })
+      if (badges.length) {
+        lines.push(`${badges.length} badges earned`)
+      }
 
       return lines.join('\n')
     },
