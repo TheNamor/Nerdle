@@ -79,3 +79,17 @@ export async function savePuzzle(token, puzzle) {
         return { ok: false, error: error.message || "Unable to reach the server. Please try again." };
     }
 }
+
+export async function saveTheme(token, theme) {
+    try {
+        const res = await fetch(`${API_BASE_URL}/theme`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify(theme)
+        });
+        return await readResponse(res);
+
+    } catch (error) {
+        return { ok: false, error: error.message || "Unable to reach the server. Please try again." };
+    }
+}

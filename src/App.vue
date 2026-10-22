@@ -1,5 +1,5 @@
 <template>
-  <v-app dark>
+  <v-app dark :style="themeStyles">
     <v-alert
       v-if="newUpdate"
       class="session-update-notification"
@@ -31,7 +31,7 @@
     <v-btn
       class="auth-launcher"
       icon
-      color="green lighten-2"
+      :color="themeStyles['--theme-primary']"
       title="Account"
       @click="authVisible = true"
     >
@@ -42,6 +42,7 @@
       v-model="authVisible"
       max-width="440px"
       :fullscreen="$vuetify.breakpoint.xsOnly"
+      persistent
     >
       <login
         :email="email"
@@ -50,7 +51,9 @@
         :completed-puzzles="completedPuzzles"
         :badge-counts="badgeCounts"
         :badge-descriptions="badgeDescriptions"
+        :theme="theme"
         @authenticated="handleAuthenticated"
+        @theme-change="updateThemeColor"
         @logout="handleLogout"
         @close="authVisible = false"
       />
@@ -64,14 +67,14 @@
             v-model="archiveDay"
             :max="yesterday"
             :events="completedPuzzles"
-            event-color="green"
+            :event-color="themeStyles['--theme-primary']"
             color="purple"
             full-width
             @change="selectArchiveDay"
           />
         </v-card-text>
         <v-card-actions class="justify-space-between">
-          <v-btn v-if="!token" text small color="green lighten-2" outlined @click="openArchiveLogin">
+          <v-btn v-if="!token" text small :color="themeStyles['--theme-primary']" outlined @click="openArchiveLogin">
             Log in to save your progress
           </v-btn>
           <v-spacer v-else></v-spacer>
@@ -86,7 +89,7 @@
             <div class="game-card">
               <div class="d-flex align-center justify-space-between mb-4">
                 <div>
-                  <div class="text-h5 font-weight-bold green--text">Nerdle</div>
+                  <div class="text-h5 font-weight-bold theme-primary-text">Nerdle</div>
                 </div>
                 <v-btn-toggle mandatory v-model="mode" rounded>
                     <v-btn color="green" :class="{'white--text': mode == 0}" rounded x-small>Daily</v-btn>
@@ -130,7 +133,7 @@
                     <div v-if="row.submitted" class="feedback-shell">
                       <v-progress-circular
                         :value="row.score[0]/row.score[1] * 100"
-                        color="green"
+                        :color="themeStyles['--theme-primary']"
                         rotate="-90"
                       >
                         <span class="progress-label">{{ Math.round(row.score[0]/row.score[1] * 100) }}%</span>
@@ -149,7 +152,7 @@
                             v-bind="attrs"
                             v-on="on"
                             small
-                            :color="isGoalTag(tag) ? 'green' : 'grey darken-3'"
+                            :color="isGoalTag(tag) ? themeStyles['--theme-primary'] : 'grey darken-3'"
                             :text-color="draftStops.includes(tag) ? 'rgb(255,0,0)' : 'white'"
                           >
                             {{ getTagLabel(tag) }}
@@ -174,14 +177,14 @@
                     :key="digit"
                     depressed
                     class="mobile-keypad-btn white--text"
-                    color="rgba(76, 175, 80, 0.14)"
+                    :style="{ backgroundColor: 'rgba(var(--theme-primary-rgb), 0.14)' }"
                     @click="pressDigit(digit)"
                   >{{ digit }}</v-btn>
                 </div>
               </div>
 
               <div class="action-bar" :class="{ 'mobile-action-bar': isMobile }">
-                <v-btn x-small outlined color="green" @click="openTutorial">How to Play</v-btn>
+                <v-btn x-small outlined :color="themeStyles['--theme-primary']" @click="openTutorial">How to Play</v-btn>
                 <div class="text-caption grey--text text--lighten-1">Guess {{ guesses.length+(gameCompleted ? 0 : 1) }} of {{ maxRows }}</div>
                 <svg 
                   xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="30" height="30"
@@ -200,7 +203,7 @@
                 <v-btn
                   v-if="guesses.length > 0 && !gameCompleted"
                   small
-                  :color="notesMode ? 'green' : 'grey'"
+                  :color="notesMode ? themeStyles['--theme-primary'] : 'grey'"
                   @click="notesMode = !notesMode"
                   icon
                   title="Notes"
@@ -208,14 +211,14 @@
                 <v-btn
                   v-if="gameCompleted"
                   small
-                  color="green"
+                  :color="themeStyles['--theme-primary']"
                   @click="winDialog = true"
                   icon
                   title="Goal Summary"
                 ><v-icon>mdi-flag-checkered</v-icon></v-btn>
                 <v-btn
                   small
-                  color="green"
+                  :color="themeStyles['--theme-primary']"
                   dark
                   class="action-lock-btn"
                   :disabled="!isGuessComplete || draftStops.length > 0 || gameCompleted || guesses.length >= maxRows"
@@ -230,7 +233,7 @@
     <v-dialog v-model="tutorialDialog" max-width="760px" :fullscreen="$vuetify.breakpoint.xsOnly">
       <v-card class="tutorial-card" color="rgba(18, 24, 20, 0.98)" dark>
         <div class="tutorial-header">
-          <v-chip class="tutorial-step-pill" color="rgba(76, 175, 80, 0.16)">{{ tutorialStep + 1 }} of 3</v-chip>
+          <v-chip class="tutorial-step-pill" :color="'rgba(var(--theme-primary-rgb), 0.16)'">{{ tutorialStep + 1 }} of 3</v-chip>
           <v-btn icon dark small class="tutorial-close" @click="closeTutorial">
             <v-icon>mdi-close</v-icon>
           </v-btn>
@@ -239,7 +242,7 @@
         <v-card-text class="tutorial-body">
           <div v-if="tutorialStep === 0" class="tutorial-page">
             <div class="tutorial-eyebrow">Welcome</div>
-            <div class="text-h5 font-weight-bold green--text mb-2">Find the secret five-digit number.</div>
+            <div class="text-h5 font-weight-bold theme-primary-text mb-2">Find the secret five-digit number.</div>
             <p class="tutorial-copy">
               The goal is to discover the target five-digit number by making guesses that get progressively closer.
               Each round gives you new clues that narrow the field until you can lock in the answer.
@@ -248,16 +251,16 @@
 
           <div v-else-if="tutorialStep === 1" class="tutorial-page">
             <div class="tutorial-eyebrow">Tags</div>
-            <div class="text-h5 font-weight-bold green--text mb-2">Use the tags as your clues.</div>
+            <div class="text-h5 font-weight-bold theme-primary-text mb-2">Use the tags as your clues.</div>
             <p class="tutorial-copy">
               Every number has a set of properties - or tags. Green tags mean the target number shares that trait, while grey tags mean it does not.
               Some tags describe the number’s properties, such as “Even” or “&lt; 50,000”, and others describe structure, such as “Upstart” (the second digit is larger than the first).
             </p>
             <div class="tutorial-visual-card">
               <div class="tag-sample">
-                <v-chip small color="green" text-color="white" class="ma-1">Even</v-chip>
+                <v-chip small :color="themeStyles['--theme-primary']" text-color="white" class="ma-1">Even</v-chip>
                 <v-chip small color="grey darken-3" text-color="white" class="ma-1">&lt; 50,000</v-chip>
-                <v-chip small color="green" text-color="white" class="ma-1">Upstart</v-chip>
+                <v-chip small :color="themeStyles['--theme-primary']" text-color="white" class="ma-1">Upstart</v-chip>
               </div>
               For example, the goal is even and has an Upstart, but is not less than 50,000
             </div>
@@ -265,7 +268,7 @@
 
           <div v-else class="tutorial-page">
             <div class="tutorial-eyebrow">Locking in</div>
-            <div class="text-h5 font-weight-bold green--text mb-2">Only guesses that fit every constraint are allowed.</div>
+            <div class="text-h5 font-weight-bold theme-primary-text mb-2">Only guesses that fit every constraint are allowed.</div>
             <p class="tutorial-copy">
               You cannot lock in a guess that includes any grey tag (the target does not have), or that is missing any green tag (the target does have).
               If a guess breaks those rules, it will be blocked and you will need to refine it.
@@ -280,7 +283,7 @@
         <v-card-actions class="justify-space-between pb-4 px-4">
           <v-btn icon text color="grey lighten-2" @click="tutorialStep = Math.max(0, tutorialStep - 1)" v-if="tutorialStep > 0"><v-icon>mdi-arrow-left-bold</v-icon></v-btn>
           <div v-else class="spacer"></div>
-          <v-btn color="green" dark @click="tutorialStep === 2 ? closeTutorial() : advanceTutorial()" :icon="tutorialStep !== 2">
+          <v-btn :color="themeStyles['--theme-primary']" dark @click="tutorialStep === 2 ? closeTutorial() : advanceTutorial()" :icon="tutorialStep !== 2">
             <div style="display: flex; align-items: center;" v-if="tutorialStep === 2 && guesses.length === 0">
               Try using &nbsp;
               <svg 
@@ -295,11 +298,11 @@
     </v-dialog>
 
     <v-dialog v-model="winDialog" max-width="50vw" :fullscreen="$vuetify.breakpoint.xsOnly" persistent>
-      <v-snackbar v-model="copied" :timeout="2000" color="success" text dark>Copied to clipboard!</v-snackbar>
+      <v-snackbar v-model="copied" :timeout="2000" :color="themeStyles['--theme-primary']" text dark>Copied to clipboard!</v-snackbar>
       <v-card class="celebration-card" color="rgba(18, 24, 20, 0.98)" :dark="true">
-        <v-card-title class="justify-center text-h5 green--text" style="word-break: normal !important; text-align: center;">{{ guesses.length <= 5 ? celebrations[guesses.length] : "It's ok... you'll do better next time!" }}</v-card-title>
+        <v-card-title class="justify-center text-h5 theme-primary-text" style="word-break: normal !important; text-align: center;">{{ guesses.length <= 5 ? celebrations[guesses.length] : "It's ok... you'll do better next time!" }}</v-card-title>
         <v-card-text class="text-center">
-          <div class="text-h6 green--text">You found the answer in {{ guesses.length }} guess{{ guesses.length === 1 ? '' : 'es' }}.</div>
+          <div class="text-h6 theme-primary-text">You found the answer in {{ guesses.length }} guess{{ guesses.length === 1 ? '' : 'es' }}.</div>
           <div class="mb-3">
             <div class="font-weight-bold mb-1">Answer</div>
             <div class="answer-pill">{{ goalGuessText }}</div>
@@ -353,7 +356,7 @@
 import seedrandom from 'seedrandom'
 import example from "./assets/example.png"
 import tagMap from '@/assets/tagMap.json'
-import { getSummary, savePuzzle, getPuzzle } from '@/data'
+import { getSummary, savePuzzle, getPuzzle, saveTheme } from '@/data'
 import Login from '@/components/Login.vue'
 
 export default {
@@ -540,6 +543,10 @@ export default {
       completedPuzzles: [],
       counts: {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0},
       badgeCounts: {},
+      theme: {
+        primary: "#4CAF50",
+        secondary: "#1A1D1B",
+      },
       tutorialStep: 0,
       celebrations: {
         1: "Lucky duck! You got it on the first try!",
@@ -555,8 +562,8 @@ export default {
 
   watch: {
     mode() {
-        this.draftGuess = Array(5).fill('')
-        this.selectedCellIndex = 0
+      this.draftGuess = Array(5).fill('')
+      this.selectedCellIndex = 0
       if (this.mode === 2) {
         this.draftNotes = Array(this.guessLength).fill(null).map(() => Array(10).fill(false))
         this.notesMode = false
@@ -566,7 +573,11 @@ export default {
         }
         this.gameCompleted = false
         return
+      } else if (this.mode === 1) {
+        this.day = this.today
+        return
       }
+      this.day = this.today
       if (this.randomGoal === null) {
             this.initializeRandomPuzzle()
         }
@@ -578,6 +589,14 @@ export default {
   },
 
   methods: {
+    updateThemeColor({ color, value }) {
+      if (this.theme && this.theme[color] == value) return
+      this.theme = { ...this.theme, [color]: value }
+      if (this.token) {
+        saveTheme(this.token, this.theme)
+      }
+    },
+
     handleOffline() {
       this.isOffline = true
       this.offlineDismissed = false
@@ -680,6 +699,9 @@ export default {
         this.counts = result.data.counts
         this.completedPuzzles = result.data.completed
         this.badgeCounts = result.data.badges || {}
+        if (result.data.theme) {
+          this.theme = {...this.theme, ...result.data.theme}
+        }
       } else if (result.status === 401) {
         this.handleLogout()
         this.newUpdate = true
@@ -1203,6 +1225,71 @@ export default {
     }
   },
   computed: {
+    themeStyles() {
+      const toRgb = color => {
+        const hex = color.slice(1)
+        return [0, 2, 4].map(index => parseInt(hex.slice(index, index + 2), 16)).join(', ')
+      }
+
+      const transformColor = (color, target) => {
+        const sourceChannels = color.match(/[a-f\d]{2}/gi).map(channel => parseInt(channel, 16))
+        const baseChannels = [76, 175, 80]
+        const targetChannels = target.match(/[a-f\d]{2}/gi).map(channel => parseInt(channel, 16))
+        return `#${sourceChannels.map((channel, index) => {
+          const transformed = Math.min(255, Math.round(channel * targetChannels[index] / baseChannels[index]))
+          return transformed.toString(16).padStart(2, '0')
+        }).join('')}`
+      }
+      
+      const dateThemes = {
+        "02-14": {primary: "#9C1414", secondary: "#271027"},
+        "03-17": {primary: "#0FB416", secondary: "#1E5208"},
+        "04-01": {primary: "#FFFFFF", secondary: "#9779df"},
+        "10-31": {primary: "#FA8500", secondary: "#000000"},
+        "12-24": {primary: "#008500", secondary: "#6B0000"},
+        "12-25": {primary: "#008500", secondary: "#6B0000"},
+      }
+
+      let dayTheme = this.theme
+      if (this.day && this.mode !== 1) {
+        const day = this.day.slice(5)
+        const year = Number(this.day.slice(0, 4))
+        const thanksgiving = new Date(Date.UTC(year, 10, 1))
+        thanksgiving.setUTCDate(22 + ((4 - thanksgiving.getUTCDay() + 7) % 7))
+
+        const a = year % 19
+        const b = Math.floor(year / 100)
+        const c = year % 100
+        const d = Math.floor(b / 4)
+        const e = b % 4
+        const f = Math.floor((b + 8) / 25)
+        const g = Math.floor((b - f + 1) / 3)
+        const h = (19 * a + b - d - g + 15) % 30
+        const i = Math.floor(c / 4)
+        const k = c % 4
+        const l = (32 + 2 * e + 2 * i - h - k) % 7
+        const m = Math.floor((a + 11 * h + 22 * l) / 451)
+        const easterMonth = Math.floor((h + l - 7 * m + 114) / 31)
+        const easterDay = (h + l - 7 * m + 114) % 31 + 1
+        const easter = new Date(Date.UTC(year, easterMonth - 1, easterDay)).toISOString().slice(5, 10)
+
+        const holidayThemes = {
+          [thanksgiving.toISOString().slice(5, 10)]: {primary: "#D2691E", secondary: "#42281B"},
+          [easter]: {primary: "#00C3A9", secondary: "#9B4364"},
+        }
+        dayTheme = dateThemes[day] || holidayThemes[day] || this.theme
+      }
+
+      return {
+        '--theme-primary': dayTheme.primary,
+        '--theme-primary-rgb': toRgb(dayTheme.primary),
+        '--theme-secondary-rgb': toRgb(dayTheme.secondary),
+        '--theme-guess-gradient-start': transformColor(dayTheme.primary, '#23452a'),
+        '--theme-guess-gradient-end': transformColor(dayTheme.primary, '#2d5346'),
+        '--theme-goal-color': transformColor(dayTheme.primary, '#a5d6a7'),
+      }
+    },
+
     baseUrl() {
       return process.env.NODE_ENV === 'production' ? '/Nerdle' : 'http://localhost:8080'
     },
@@ -1262,7 +1349,6 @@ export default {
             badges.push('luck_max')
           } else if (available.length >= 4) {
             left = available.length
-            console.log(left, idx)
             if (left == 4) badges.push('luck_4')
             else if (5 <= left && left < 10) badges.push('luck_5')
             else if (10 <= left && left < 30) badges.push('luck_10')
@@ -1781,6 +1867,10 @@ button {
   background: rgba(18, 24, 20, 0.82);
 }
 
+.theme-primary-text {
+  color: var(--theme-primary) !important;
+}
+
 .app-shell {
   min-height: 100vh;
   background: linear-gradient(135deg, #131817 0%, #070807 100%);
@@ -1790,7 +1880,7 @@ button {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 20px;
   padding: 20px;
-  background: rgba(26, 29, 27, 0.88);
+  background: rgba(var(--theme-secondary-rgb), 0.88);
   box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(10px);
   width: 75%;
@@ -1849,8 +1939,8 @@ button {
 }
 
 .cell.selected {
-  border-color: rgba(76, 175, 80, 0.4);
-  box-shadow: inset 0 0 0 1px rgba(76, 175, 80, 0.25);
+  border-color: rgba(var(--theme-primary-rgb), 0.4);
+  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-rgb), 0.25);
 }
 
 .input-cell {
@@ -1883,7 +1973,7 @@ button {
   align-items: center;
   justify-content: center;
   /* size relative to the cell's font-size so it scales responsively */
-  color: rgba(230, 255, 234, 0.95);
+  color: var(--theme-primary);
   text-align: center;
   line-height: 1;
   height: 100%;
@@ -1894,7 +1984,7 @@ button {
 }
 
 .filled {
-  background: linear-gradient(145deg, #23452a, #2d5346);
+  background: linear-gradient(145deg, var(--theme-guess-gradient-start), var(--theme-guess-gradient-end));
   color: #f5f7fa;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
@@ -1929,11 +2019,11 @@ button {
 }
 
 .celebration-card {
-  border: 2px solid rgba(91, 255, 96, 0.25);
+  border: 2px solid rgba(var(--theme-primary-rgb), 0.25);
 }
 
 .tutorial-card {
-  border: 1px solid rgba(76, 175, 80, 0.25);
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.25);
   border-radius: 18px;
   overflow: hidden;
 }
@@ -1960,7 +2050,7 @@ button {
 }
 
 .tutorial-eyebrow {
-  color: #76c07a;
+  color: var(--theme-primary);
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.2em;
@@ -2012,8 +2102,8 @@ button {
   display: inline-block;
   padding: 8px 14px;
   border-radius: 999px;
-  background: rgba(76, 175, 80, 0.16);
-  color: #a5d6a7;
+  background: rgba(var(--theme-primary-rgb), 0.16);
+  color: var(--theme-goal-color);
   font-weight: 700;
   letter-spacing: 0.08em;
 }

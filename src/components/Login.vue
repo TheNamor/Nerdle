@@ -1,14 +1,74 @@
 <template>
-	<v-card class="login-card" color="rgba(18, 24, 20, 0.98)" dark>
+	<v-card class="login-card" color="rgba(18, 24, 20, 0.98)" dark :style="themeStyles">
 		<v-btn icon small class="login-close" aria-label="Close" @click="$emit('close')">
 			<v-icon>mdi-close</v-icon>
 		</v-btn>
 
 		<template v-if="authenticated">
 			<div class="account-view">
-				<div class="login-eyebrow">Signed in as</div>
-				<div class="account-email">{{ email }}</div>
-				<v-tabs v-model="activeTab" background-color="transparent" color="green lighten-2" grow>
+				<div class="account-header">
+					<div class="account-identity">
+						<div class="login-eyebrow">Signed in as</div>
+						<div class="account-email">{{ email }}</div>
+					</div>
+					<fieldset class="theme-picker-group">
+						<legend>Theme</legend>
+						<div class="theme-color-picker">
+							<span>Primary</span>
+							<v-menu v-model="themePickerMenus.primary" :close-on-content-click="false" offset-y>
+								<template v-slot:activator="{ on, attrs }">
+									<button
+										v-bind="attrs"
+										type="button"
+										class="theme-color-swatch"
+										:style="{ backgroundColor: theme.primary }"
+										:aria-label="`Choose primary theme color, currently ${theme.primary}`"
+										v-on="on"
+									></button>
+								</template>
+								<v-color-picker
+									ref="primaryColorPicker"
+									style="background-color: #1E1E1E;"
+									v-model="themeDraft.primary"
+									hide-inputs
+									hide-mode-switch
+								/>
+							</v-menu>
+						</div>
+						<div class="theme-color-picker">
+							<span>Secondary</span>
+							<v-menu v-model="themePickerMenus.secondary" :close-on-content-click="false" offset-y>
+								<template v-slot:activator="{ on, attrs }">
+									<button
+										v-bind="attrs"
+										type="button"
+										class="theme-color-swatch"
+										:style="{ backgroundColor: theme.secondary }"
+										:aria-label="`Choose secondary theme color, currently ${theme.secondary}`"
+										v-on="on"
+									></button>
+								</template>
+								<v-color-picker
+									v-model="themeDraft.secondary"
+									style="background-color: #1E1E1E;"
+									hide-inputs
+									hide-mode-switch
+								/>
+							</v-menu>
+						</div>
+						<v-btn
+							icon
+							small
+							class="theme-reset-button"
+							aria-label="Reset theme colors to defaults"
+							title="Reset theme colors to defaults"
+							@click="resetTheme"
+						>
+							<v-icon small>mdi-refresh</v-icon>
+						</v-btn>
+					</fieldset>
+				</div>
+				<v-tabs v-model="activeTab" background-color="transparent" :color="theme.primary" grow>
 					<v-tab>Guess counts</v-tab>
 					<v-tab>Badges</v-tab>
 				</v-tabs>
@@ -31,11 +91,11 @@
 					<v-tab-item eager>
 						<div class="stats-heading">Badges collected</div>
 						<div v-if="collectedBadges.length" class="badge-pagination">
-							<v-btn icon small aria-label="Previous badge page" color="success" :disabled="badgePageIndex === 0" @click="changeBadgePage(-1)">
+							<v-btn icon small aria-label="Previous badge page" :color="theme.primary" :disabled="badgePageIndex === 0" @click="changeBadgePage(-1)">
 								<v-icon>mdi-chevron-left</v-icon>
 							</v-btn>
 							<span class="badge-page-label">{{ badgePageLabel }}</span>
-							<v-btn icon small aria-label="Next badge page" color="success" :disabled="badgePageIndex >= badgePageCount - 1" @click="changeBadgePage(1)">
+							<v-btn icon small aria-label="Next badge page" :color="theme.primary" :disabled="badgePageIndex >= badgePageCount - 1" @click="changeBadgePage(1)">
 								<v-icon>mdi-chevron-right</v-icon>
 							</v-btn>
 						</div>
@@ -72,7 +132,7 @@
 						<div v-else class="badge-empty">No badges collected yet.</div>
 					</v-tab-item>
 				</v-tabs-items>
-				<v-btn block outlined color="green lighten-2" style="max-height: 36px;" @click="logout">
+				<v-btn block outlined :color="theme.primary" style="max-height: 36px;" @click="logout">
 					<v-icon left>mdi-logout</v-icon>
 					Log out
 				</v-btn>
@@ -82,9 +142,9 @@
 		<div class="login-header">
 			<div>
 				<div class="login-eyebrow">Welcome to the</div>
-				<div class="text-h4 font-weight-bold green--text">Nerdle</div>
+				<div class="text-h4 font-weight-bold theme-primary-text">Nerdle</div>
 			</div>
-			<v-icon color="green lighten-1" large>mdi-lock-outline</v-icon>
+			<v-icon :color="theme.primary" large>mdi-lock-outline</v-icon>
 		</div>
 
 		<v-card-text class="pt-2">
@@ -98,7 +158,7 @@
 					autocomplete="email"
 					outlined
 					dense
-					color="green"
+					:color="theme.primary"
 					:error-messages="emailError"
 					@input="clearError"
 				/>
@@ -110,7 +170,7 @@
 					:autocomplete="isRegistering ? 'new-password' : 'current-password'"
 					outlined
 					dense
-					color="green"
+					:color="theme.primary"
 					:error-messages="passwordError"
 					@click:append="showPassword = !showPassword"
 					@input="clearError"
@@ -123,7 +183,7 @@
 					autocomplete="new-password"
 					outlined
 					dense
-					color="green"
+					:color="theme.primary"
 					:error-messages="confirmationError"
 					@input="clearError"
 				/>
@@ -135,7 +195,7 @@
 					{{ successMessage }}
 				</v-alert>
 
-				<v-btn block color="green" dark large type="submit" :loading="loading">
+				<v-btn block :color="theme.primary" dark large type="submit" :loading="loading">
 					{{ isRegistering ? 'Create account' : 'Log in' }}
 				</v-btn>
 			</v-form>
@@ -143,7 +203,7 @@
 
 		<v-card-actions class="justify-center pb-5">
 			<span class="login-switch-copy">{{ isRegistering ? 'Already have an account?' : 'New to Nerdle?' }}</span>
-			<v-btn text small color="green lighten-2" @click="toggleMode">
+			<v-btn text small :color="theme.primary" @click="toggleMode">
 				{{ isRegistering ? 'Log in' : 'Register' }}
 			</v-btn>
 		</v-card-actions>
@@ -181,6 +241,10 @@ export default {
 		completedPuzzles: {
 			type: Array,
 			default: () => []
+		},
+		theme: {
+			type: Object,
+			default: () => ({ primary: '#4CAF50', secondary: '#1A1D1B' })
 		}
 	},
 
@@ -191,6 +255,14 @@ export default {
 			badgeColumns: 1,
 			badgePageSize: 1,
 			badgeResizeObserver: null,
+			themeDraft: {
+				primary: '#4CAF50',
+				secondary: '#1A1D1B'
+			},
+			themePickerMenus: {
+				primary: false,
+				secondary: false
+			},
 			isRegistering: false,
 			formEmail: '',
 			password: '',
@@ -206,6 +278,17 @@ export default {
 	},
 
 	methods: {
+		queueThemeUpdate(color) {
+			this.$emit('theme-change', { color, value: this.themeDraft[color] })
+		},
+
+		resetTheme() {
+			this.themeDraft.primary = '#4CAF50'
+			this.themeDraft.secondary = '#1A1D1B'
+			this.$emit('theme-change', { color: 'primary', value: this.themeDraft.primary })
+			this.$emit('theme-change', { color: 'secondary', value: this.themeDraft.secondary })
+		},
+
 		observeBadgePage() {
 			const page = this.$refs.badgePage
 			if (!page) return
@@ -307,6 +390,7 @@ export default {
 			this.badgeResizeObserver = new ResizeObserver(this.updateBadgePageSize)
 		}
 		this.$nextTick(() => this.observeBadgePage())
+		this.themeDraft = { ...this.theme }
 	},
 
 	beforeDestroy() {
@@ -315,6 +399,14 @@ export default {
 	},
 
 	computed: {
+		themeStyles() {
+			const hex = this.theme.primary.slice(1)
+			const rgb = [0, 2, 4].map(index => parseInt(hex.slice(index, index + 2), 16)).join(', ')
+			return {
+				'--theme-primary': this.theme.primary,
+				'--theme-primary-rgb': rgb
+			}
+		},
 		baseUrl() {
 			return process.env.NODE_ENV === 'production' ? '/Nerdle' : 'http://localhost:8080'
 		},
@@ -370,6 +462,16 @@ export default {
 
 		badgePageCount(count) {
 			if (this.badgePageIndex >= count) this.badgePageIndex = count - 1
+		},
+		"themePickerMenus.primary"(newVal, oldVal) {
+			if (oldVal && !newVal) {
+				this.queueThemeUpdate("primary")
+			}
+		},
+		"themePickerMenus.secondary"(newVal, oldVal) {
+			if (oldVal && !newVal) {
+				this.queueThemeUpdate("secondary")
+			}
 		}
 	},
 }
@@ -379,7 +481,7 @@ export default {
 .login-card {
 	position: relative;
 	width: min(100%, 440px);
-	border: 1px solid rgba(76, 175, 80, 0.28);
+	border: 1px solid rgba(var(--theme-primary-rgb), 0.28);
 	border-radius: 18px;
 	box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
 }
@@ -398,6 +500,67 @@ export default {
 	height: auto;
 	max-height: min(560px, calc(100vh - 32px));
 	overflow: hidden;
+}
+
+.account-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+	margin-bottom: 8px;
+}
+
+.account-identity {
+	min-width: 0;
+}
+
+.theme-picker-group {
+	display: flex;
+	flex: 0 0 auto;
+	gap: 10px;
+	margin: 0;
+	padding: 4px 8px 8px;
+	border: 1px solid rgba(255, 255, 255, 0.16);
+	border-radius: 8px;
+}
+
+.theme-picker-group legend {
+	padding: 0 4px;
+	color: rgba(255, 255, 255, 0.72);
+	font-size: 0.7rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.theme-color-picker {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	color: rgba(255, 255, 255, 0.82);
+	font-size: 0.75rem;
+}
+
+.theme-color-swatch {
+	width: 28px;
+	height: 26px;
+	border: 1px solid rgba(255, 255, 255, 0.5);
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.theme-color-swatch:focus-visible,
+.theme-reset-button:focus-visible {
+	outline: 2px solid white;
+	outline-offset: 2px;
+}
+
+.theme-reset-button {
+	align-self: center;
+}
+
+.theme-primary-text {
+	color: var(--theme-primary) !important;
 }
 
 .account-view >>> .v-tabs,
@@ -535,7 +698,7 @@ export default {
 	min-width: 21px;
 	padding: 2px 5px;
 	border-radius: 10px;
-	background: #4caf50;
+	background: var(--theme-primary);
 	color: white;
 	font-size: 0.7rem;
 	font-weight: 700;
@@ -594,7 +757,7 @@ export default {
 	min-width: 0;
 	height: 100%;
 	padding: 0 5px 0 10px;
-	background: #4caf50;
+	background: var(--theme-primary);
 	color: white;
 	font-size: 0.75rem;
 	font-weight: 700;
@@ -608,7 +771,7 @@ export default {
 }
 
 .login-eyebrow {
-	color: #76c07a;
+	color: var(--theme-primary);
 	font-size: 0.75rem;
 	font-weight: 700;
 	letter-spacing: 0.18em;
@@ -638,6 +801,10 @@ export default {
 	.account-view {
 		min-height: 100vh;
 		max-height: 100vh;
+	}
+
+	.account-header {
+		flex-wrap: wrap;
 	}
 
 	.account-tab-content {
