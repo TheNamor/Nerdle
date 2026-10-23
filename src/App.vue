@@ -573,7 +573,7 @@ export default {
         }
         this.gameCompleted = false
         return
-      } else if (this.mode === 1) {
+      } else if (this.mode === 0) {
         this.day = this.today
         return
       }
