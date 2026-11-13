@@ -132,11 +132,11 @@
 
                     <div v-if="row.submitted" class="feedback-shell">
                       <v-progress-circular
-                        :value="row.score[0]/row.score[1] * 100"
+                        :value="row.false_99 ? 99 : row.score[0]/row.score[1] * 100"
                         :color="themeStyles['--theme-primary']"
                         rotate="-90"
                       >
-                        <span class="progress-label">{{ Math.round(row.score[0]/row.score[1] * 100) }}%</span>
+                        <span class="progress-label">{{ row.false_99 ? 99 : Math.round(row.score[0]/row.score[1] * 100) }}%</span>
                       </v-progress-circular>
                     </div>
                     <div v-else-if="!gameCompleted" class="feedback-shell muted">
@@ -564,8 +564,10 @@ export default {
     mode() {
       this.draftGuess = Array(5).fill('')
       this.selectedCellIndex = 0
+      // clear notes when switching modes
+      this.draftNotes = Array(this.guessLength).fill(null).map(() => Array(10).fill(false))
+      this.notesMode = false
       if (this.mode === 2) {
-        this.draftNotes = Array(this.guessLength).fill(null).map(() => Array(10).fill(false))
         this.notesMode = false
         if (!this.archiveDay) {
           this.archiveDialog = true
@@ -575,15 +577,13 @@ export default {
         return
       } else if (this.mode === 0) {
         this.day = this.today
+        this.gameCompleted = this.guesses.length > 0 && this.guesses[this.guesses.length-1].guess.join('') === this.goal.guess.join('')
         return
       }
       this.day = this.today
       if (this.randomGoal === null) {
             this.initializeRandomPuzzle()
         }
-        // clear notes when switching modes
-        this.draftNotes = Array(this.guessLength).fill(null).map(() => Array(10).fill(false))
-        this.notesMode = false
         this.gameCompleted = this.guesses.length > 0 && this.guesses[this.guesses.length-1].guess.join('') === this.goal.guess.join('')
     }
   },
@@ -1419,11 +1419,12 @@ export default {
       const { stats, badges } = this.guessStats
       stats.forEach((stat, idx) => {
         const { correct, total, available } = stat
-        const pct = total > 0 ? Math.round((correct / total) * 100) : 0
+        let pct = total > 0 ? Math.round((correct / total) * 100) : 0
+        if (pct === 100 && idx !== this.guesses.length-1) pct = 99
         lines.push(`${idx + 1}. ${correct}/${total} tags (${pct}%) - ` + (idx == this.guesses.length-1 ? `done!` : `${available.length} number${available.length === 1 ? '' : 's'} left`))
       })
       if (badges.length) {
-        lines.push(`${badges.length} badges earned`)
+        lines.push(`${badges.length} badge${badges.length === 1 ? '' : 's'} earned`)
       }
 
       return lines.join('\n')
@@ -1460,6 +1461,7 @@ export default {
         submitted: true,
         cells: guess.guess,
         score: guess.score,
+        false_99: this.goal.guess.join('') != guess.guess.join('') && guess.score[0] == guess.score[1],
         index
       }))
 
@@ -1468,6 +1470,7 @@ export default {
           submitted: false,
           cells: this.draftGuess,
           score: 0,
+          false_99: false,
           index: rows.length
         })
       }
@@ -1755,19 +1758,19 @@ export default {
         },
         luck_5: {
           title: 'Lucky 5',
-          description: 'Got the goal when more than 5 possible numbers remained. Pretty lucky!'
+          description: 'Got the goal when 5 or more possible numbers remained. Pretty lucky!'
         },
         luck_10: {
           title: 'Lucky 10',
-          description: 'Got the goal when more than 10 possible numbers remained. Very lucky!'
+          description: 'Got the goal when 10 or more possible numbers remained. Very lucky!'
         },
         luck_30: {
           title: 'Lucky 30',
-          description: 'Got the goal when more than 30 possible numbers remained. Extremely lucky!'
+          description: 'Got the goal when 30 or more possible numbers remained. Extremely lucky!'
         },
         luck_50: {
           title: 'Lucky 50',
-          description: 'Got the goal when more than 50 possible numbers remained. What are the odds?!'
+          description: 'Got the goal when 50 or more possible numbers remained. What are the odds?!'
         },
         luck_max: {
           title: 'Maximum Luck',
@@ -1775,7 +1778,7 @@ export default {
         },
         strong_start: {
           title: 'Strong Start',
-          description: 'Get at 50% or more of the correct tags on your first guess.'
+          description: 'Get 50% or more of the correct tags on your first guess.'
         },
         gold_start: {
           title: 'Gold Start',
@@ -1783,7 +1786,7 @@ export default {
         },
         excellent_guess: {
           title: 'Excellent Guess',
-          description: 'Get at least 50% of the correct tags on a single guess.'
+          description: 'Gain at least 50% of the correct tags on a single guess.'
         },
         unlucky: {
           title: 'Unlucky',
@@ -1815,7 +1818,7 @@ export default {
         },
         yippee: {
           title: 'Yippee!',
-          description: 'Make a guess that has all new correct tags (but is not the goal number).'
+          description: 'Make a guess that has only new correct tags (but is not the goal number).'
         },
         so_close: {
           title: 'So Close',
